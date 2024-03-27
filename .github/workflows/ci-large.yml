@@ -22,7 +22,6 @@ jobs:
       matrix:
         label: [""]
         os: [ubuntu-latest]
-        #os: [ubuntu-latest, macos-latest]
         cc: [gcc-12]
         ngx: [1.25.5]
         runtime: [wasmtime, wasmer, v8]
@@ -47,6 +46,35 @@ jobs:
             debug: debug
             hup: no_hup
             module_type: static
+          # macOS - Wasmer (full)
+          - runtime: wasmer
+            wasmer: 3.1.1
+            os: macos-latest
+            cc: clang
+            ngx: 1.25.4
+            ssl: ssl
+            debug: debug
+            hup: no_hup
+          # macOS - Wasmtime
+          - runtime: wasmtime
+            wasmtime: 19.0.0
+            os: macos-latest
+            cc: clang
+            ngx: 1.25.4
+            ssl: ssl
+            debug: debug
+            hup: hup
+            path: t/01-wasm
+          # macOS - V8
+          - runtime: v8
+            v8: 12.0.267.17
+            os: macos-latest
+            cc: clang
+            ngx: 1.25.4
+            ssl: ssl
+            debug: debug
+            hup: no_hup
+            path: t/01-wasm
     uses: ./.github/workflows/job-unit-tests.yml
     with:
       os: ${{ matrix.os }}
@@ -62,6 +90,7 @@ jobs:
       debug: ${{ matrix.debug }}
       hup: ${{ matrix.hup }}
       module_type: ${{ matrix.module_type }}
+      path: ${{ matrix.path }}
 
   valgrind:
     name: 'Valgrind'
