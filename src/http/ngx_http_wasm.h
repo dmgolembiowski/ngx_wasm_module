@@ -31,7 +31,7 @@ struct ngx_http_wasm_req_ctx_s {
     void                              *data;                    /* per-stream extra context */
 
 #if (NGX_WASM_LUA)
-    ngx_wasm_lua_ctx_t                *wasm_lua_ctx;
+    ngx_queue_t                        wasm_lua_ctxs;
 #endif
 
     ngx_chain_t                       *free_bufs;
@@ -78,6 +78,7 @@ struct ngx_http_wasm_req_ctx_s {
 
     unsigned                           ffi_attached:1;
     unsigned                           pwm_lua_resolver:1;      /* use Lua-land resolver in OpenResty */
+    unsigned                           any_lua_yielded:1;       /* any item in the queue has 'yielded' set */
 };
 
 

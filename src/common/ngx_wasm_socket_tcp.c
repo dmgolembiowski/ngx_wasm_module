@@ -404,6 +404,13 @@ ngx_wasm_socket_tcp_connect(ngx_wasm_socket_tcp_t *sock)
                    "wasm tcp socket resolving...");
 
     rc = resolver_pt(rslv_ctx);
+
+#if (NGX_WASM_HTTP && NGX_WASM_LUA)
+    if (rc == NGX_AGAIN) {
+        rctx->any_lua_yielded = 1;
+    }
+#endif
+
     if (rc != NGX_OK && rc != NGX_AGAIN) {
         ngx_log_debug0(NGX_LOG_DEBUG_WASM, sock->log, 0,
                        "wasm tcp socket resolver failed before query");

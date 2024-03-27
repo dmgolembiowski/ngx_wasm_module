@@ -16,6 +16,8 @@ typedef ngx_int_t (*ngx_wasm_lua_handler_pt)(ngx_wasm_lua_ctx_t *lctx);
 
 
 struct ngx_wasm_lua_ctx_s {
+    ngx_queue_t                     q;                /* rctx->wasm_lua_ctxs */
+
     ngx_pool_t                     *pool;
     ngx_log_t                      *log;
     ngx_wasm_subsys_env_t           env;

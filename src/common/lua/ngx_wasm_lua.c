@@ -88,10 +88,9 @@ ngx_wasm_lua_thread_destroy(ngx_wasm_lua_ctx_t *lctx)
 #if (NGX_WASM_HTTP)
     case NGX_WASM_SUBSYS_HTTP:
     {
-        ngx_http_wasm_req_ctx_t  *rctx = env->ctx.rctx;
         ngx_http_lua_ctx_t       *ctx = lctx->ctx.rlctx;
 
-        rctx->wasm_lua_ctx = NULL;
+        ngx_queue_remove(&lctx->q);
 
         if (ctx) {
             /* prevent ngx_http_lua_run_thread from running the
@@ -258,9 +257,6 @@ ngx_wasm_lua_thread_init(ngx_wasm_lua_ctx_t *lctx)
             if (ctx == NULL) {
                 return NGX_ERROR;
             }
-
-        } else {
-            ngx_http_lua_reset_ctx(r, lctx->L, ctx);
         }
 
         /* preserve ngx_wasm_lua_content_wev_handler */
@@ -283,9 +279,6 @@ ngx_wasm_lua_thread_init(ngx_wasm_lua_ctx_t *lctx)
             if (ctx == NULL) {
                 return NGX_ERROR;
             }
-
-        } else {
-            ngx_stream_lua_reset_ctx(r, lctx->L, ctx);
         }
 
         lctx->ctx.slctx = ctx;
@@ -410,7 +403,8 @@ ngx_wasm_lua_thread_run(ngx_wasm_lua_ctx_t *lctx)
         ngx_http_lua_attach_co_ctx_to_L(lctx->co, ctx->cur_co_ctx);
 
         lctx->co_ctx = ctx->cur_co_ctx;
-        lctx->env.ctx.rctx->wasm_lua_ctx = lctx;
+
+        ngx_queue_insert_tail(&lctx->env.ctx.rctx->wasm_lua_ctxs, &lctx->q);
 
         rc = ngx_http_lua_run_thread(lctx->L, r, ctx, lctx->nargs);
         break;

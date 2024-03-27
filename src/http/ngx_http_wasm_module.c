@@ -533,6 +533,11 @@ ngx_http_wasm_rctx(ngx_http_request_t *r, ngx_http_wasm_req_ctx_t **out)
         rctx->req_keepalive = r->keepalive;
         rctx->fake_request = fake;
 
+#if (NGX_WASM_LUA)
+        ngx_queue_init(&rctx->wasm_lua_ctxs);
+        rctx->any_lua_yielded = 0;
+#endif
+
         /* setup subsystem env */
 
         rctx->env.connection = r->connection;
@@ -672,7 +677,10 @@ ngx_http_wasm_rewrite_handler(ngx_http_request_t *r)
     }
 
 #if (NGX_WASM_LUA)
-    if (rctx->wasm_lua_ctx && rctx->wasm_lua_ctx->yielded) {
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "any lua yielded? %d", rctx->any_lua_yielded);
+
+    if (rctx->any_lua_yielded) {
         /* previous Lua yield in previous rewrite, resume */
         dd("wasm lua forcing content wev handler");
         ngx_http_wasm_wev_handler(r);
@@ -921,7 +929,9 @@ ngx_http_wasm_content_handler(ngx_http_request_t *r)
     }
 
 #if (NGX_WASM_LUA)
-    if (rctx->entered_content_phase && rctx->wasm_lua_ctx) {
+    if (rctx->entered_content_phase
+        && !ngx_queue_empty(&rctx->wasm_lua_ctxs))
+    {
         dd("wasm lua forcing content wev handler");
         ngx_http_wasm_wev_handler(r);
         rc = ngx_http_wasm_check_finalize(rctx, NGX_AGAIN);
@@ -975,6 +985,11 @@ ngx_http_wasm_wev_handler(ngx_http_request_t *r)
     ngx_connection_t          *c = r->connection;
     ngx_event_t               *wev = c->write;
 #endif
+#if (NGX_WASM_LUA)
+    ngx_queue_t               *q, *nextq;
+    ngx_wasm_lua_ctx_t        *lctx;
+    ngx_int_t                  resumed = 0;
+#endif
 
     dd("enter");
 
@@ -993,22 +1008,37 @@ ngx_http_wasm_wev_handler(ngx_http_request_t *r)
                    r->main->count, rctx->resp_finalized, rctx->env.state);
 
 #if (NGX_WASM_LUA)
-    if (rctx->wasm_lua_ctx) {
-        rc = ngx_wasm_lua_thread_resume(rctx->wasm_lua_ctx);
+    for (q = ngx_queue_head(&rctx->wasm_lua_ctxs);
+         q != ngx_queue_sentinel(&rctx->wasm_lua_ctxs);
+         q = nextq)
+    {
+        /* grab next item before lctx is destroyed */
+        nextq = ngx_queue_next(q);
 
-        dd("lua thread resume rc: %ld", rc);
+        lctx = ngx_queue_data(q, ngx_wasm_lua_ctx_t, q);
 
-        switch (rc) {
-        case NGX_ERROR:
-            rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-            goto last_finalize;
-        case NGX_DONE:
-            rctx->wasm_lua_ctx = NULL;
-            break;
-        default:
-            break;
+        if (!lctx->yielded) {
+            dd("lctx not yielded, skip");
+            continue;
         }
 
+        dd("will resume lua thread (lctx: %p)", lctx);
+
+        resumed = 1;
+        rc = ngx_wasm_lua_thread_resume(lctx);
+
+        dd("lua thread (lctx: %p) resume rc: %ld", lctx, rc);
+
+        if (rc == NGX_ERROR) {
+            rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+            goto last_finalize;
+        } else if (rc == NGX_AGAIN) {
+            lctx->yielded = 1;
+            rctx->any_lua_yielded = 1;
+        }
+    }
+
+    if (resumed) {
         return;
     }
 #endif

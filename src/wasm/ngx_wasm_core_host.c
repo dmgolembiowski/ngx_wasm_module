@@ -63,6 +63,7 @@ ngx_wasm_hfuncs_test_lua_argsrets(ngx_wavm_instance_t *instance,
     lua_pushstring(lctx->co, "argument");
 
     (void) ngx_wasm_lua_thread_run(lctx);
+    rctx->any_lua_yielded |= lctx->yielded;
 
     return NGX_WAVM_OK;
 }
@@ -99,6 +100,7 @@ ngx_wasm_hfuncs_test_lua_bad_chunk(ngx_wavm_instance_t *instance,
     }
 
     (void) ngx_wasm_lua_thread_run(lctx);
+    rctx->any_lua_yielded |= lctx->yielded;
 
     return NGX_WAVM_OK;
 }
