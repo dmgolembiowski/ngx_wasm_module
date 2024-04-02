@@ -241,6 +241,7 @@ struct ngx_proxy_wasm_ctx_s {
     ngx_str_t                                     connection_id;     /* r->connection->number */
     ngx_str_t                                     mtls;              /* ngx.https && ngx.ssl_client_verify */
     ngx_str_t                                     root_id;           /* pwexec->root_id */
+    ngx_str_t                                     worker_id;         /* ngx_worker */
     ngx_str_t                                     call_status;       /* dispatch response status */
     ngx_str_t                                     response_status;   /* response status */
     ngx_uint_t                                    call_code;

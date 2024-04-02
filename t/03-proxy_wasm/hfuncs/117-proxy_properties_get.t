@@ -596,7 +596,49 @@ qr/$checks/
 
 
 
-=== TEST 13: proxy_wasm - get_property() - uri encoded request.path on: request_headers
+=== TEST 13: proxy_wasm - get_property() - host properties on: request_headers, request_body, response_headers, response_body
+--- load_nginx_modules: ngx_http_echo_module
+--- wasm_modules: hostcalls
+--- config eval
+my $phases = CORE::join(',', qw(
+    request_headers
+    request_body
+    response_headers
+    response_body
+));
+
+qq {
+    location /t {
+        proxy_wasm hostcalls 'on=$phases \
+                              test=/t/log/properties \
+                              name=worker_id';
+        echo ok;
+    }
+}
+--- response_body
+ok
+--- grep_error_log eval: qr/worker_id+: [\w\.]+ at \w+/
+--- grep_error_log_out eval
+my $checks;
+my @phases = qw(
+    RequestHeaders
+    ResponseHeaders
+    ResponseBody
+    ResponseBody
+);
+
+foreach my $phase (@phases) {
+    $checks .= "worker_id: 0 at $phase\n";
+}
+
+qr/$checks/
+--- no_error_log
+[error]
+[crit]
+
+
+
+=== TEST 14: proxy_wasm - get_property() - uri encoded request.path on: request_headers
 --- load_nginx_modules: ngx_http_echo_module
 --- wasm_modules: hostcalls
 --- config
@@ -620,7 +662,7 @@ qr/request.path: \/t\?foo=std\:\:min\&bar=\[1,2\]/
 
 
 
-=== TEST 14: proxy_wasm - get_property() - explicitly unsupported properties on: request_headers
+=== TEST 15: proxy_wasm - get_property() - explicitly unsupported properties on: request_headers
 --- load_nginx_modules: ngx_http_echo_module
 --- wasm_modules: hostcalls
 --- config eval
@@ -667,7 +709,7 @@ qr/"response.code_details" property not supported
 
 
 
-=== TEST 15: proxy_wasm - get_property() - unknown property on: request_headers
+=== TEST 16: proxy_wasm - get_property() - unknown property on: request_headers
 --- wasm_modules: hostcalls
 --- load_nginx_modules: ngx_http_echo_module
 --- config
