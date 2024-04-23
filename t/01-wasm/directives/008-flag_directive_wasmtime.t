@@ -92,7 +92,7 @@ qr/setting flag: "debug_info=off"/
 --- main_config
     wasm {
         wasmtime {
-            flag cache_config_load missing_file;
+            cache_config missing_file;
         }
     }
 --- error_log eval
@@ -112,7 +112,7 @@ invalid contents
 --- main_config
     wasm {
         wasmtime {
-            flag cache_config_load $TEST_NGINX_HTML_DIR/wasmtime_config.toml;
+            cache_config $TEST_NGINX_HTML_DIR/wasmtime_config.toml;
         }
     }
 --- error_log eval
@@ -136,7 +136,7 @@ qq{
         module hostcalls $t::TestWasmX::crates/hostcalls.wasm;
 
         wasmtime {
-            flag cache_config_load $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
+            cache_config $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
         }
     }
 }
@@ -151,7 +151,7 @@ Host: localhost
 Connection: close
 Hello: wasm
 --- error_log eval
-qr@setting flag: "cache_config_load=.*/wasmtime_config.toml"@
+qr@setting wasmtime cache config file: ".*/wasmtime_config.toml"@
 --- no_error_log
 [error]
 
@@ -170,7 +170,7 @@ qq{
         module hostcalls $t::TestWasmX::crates/hostcalls.wasm;
 
         wasmtime {
-            flag cache_config_load $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
+            cache_config $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
         }
     }
 }
@@ -185,7 +185,7 @@ Host: localhost
 Connection: close
 Hello: wasm
 --- error_log eval
-qr@setting flag: "cache_config_load=.*/wasmtime_config.toml"@
+qr@setting wasmtime cache config file: ".*/wasmtime_config.toml"@
 --- no_error_log
 [error]
 
