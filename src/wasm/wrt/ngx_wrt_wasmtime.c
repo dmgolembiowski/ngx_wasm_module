@@ -8,13 +8,18 @@
 #include <ngx_wasi.h>
 
 
-#define NGX_WRT_WASMTIME_STACK_NARGS  10
-#define NGX_WRT_WASMTIME_STACK_NRETS  10
+#define NGX_WRT_WASMTIME_STACK_NARGS     10
+#define NGX_WRT_WASMTIME_STACK_NRETS     10
+#define NGX_WRT_WASMTIME_CONFIG_ERR_LEN  255
 
 
 typedef void (*wasmtime_config_set_int_pt)(wasm_config_t *config,
     uint64_t value);
 typedef void (*wasmtime_config_set_bool_pt)(wasm_config_t *config, bool value);
+
+
+static u_char * ngx_wasmtime_log_handler(ngx_wrt_res_t *res, u_char *buf,
+    size_t len);
 
 
 static ngx_int_t
@@ -70,6 +75,47 @@ strategy_flag_handler(wasm_config_t *config, ngx_str_t *name, ngx_str_t *value,
 
     } else if (ngx_str_eq(value->data, value->len, "cranelift", -1)) {
         wasmtime_config_strategy_set(config, WASMTIME_STRATEGY_CRANELIFT);
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+cache_config_load_flag_handler(wasm_config_t *config, ngx_str_t *name,
+    ngx_str_t *value, ngx_log_t *log, void *wrt_setter)
+{
+    char              *pathname;
+    u_char            *errmsg;
+    wasmtime_error_t  *err;
+
+    pathname = ngx_calloc(value->len + 1, log);
+    if (pathname == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(pathname, value->data, value->len);
+
+    err = wasmtime_config_cache_config_load(config, pathname);
+
+    ngx_free(pathname);
+
+    if (err) {
+        errmsg = ngx_calloc(NGX_WRT_WASMTIME_CONFIG_ERR_LEN + 1, log);
+        if (errmsg == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_wasmtime_log_handler((ngx_wrt_res_t *) err, errmsg,
+                                 NGX_WRT_WASMTIME_CONFIG_ERR_LEN);
+
+        ngx_log_error(NGX_LOG_EMERG, log, 0,
+                      "failed configuring wasmtime cache; %s",
+                      errmsg);
+
+        ngx_free(errmsg);
+
+        return NGX_ERROR;
     }
 
     return NGX_OK;
@@ -721,6 +767,10 @@ static ngx_wrt_flag_handler_t  flag_handlers[] = {
     { ngx_string("debug_info"),
       bool_flag_handler,
       wasmtime_config_debug_info_set },
+
+    { ngx_string("cache_config_load"),
+      cache_config_load_flag_handler,
+      NULL }, /* const char * */
 
     { ngx_string("consume_fuel"),
       bool_flag_handler,

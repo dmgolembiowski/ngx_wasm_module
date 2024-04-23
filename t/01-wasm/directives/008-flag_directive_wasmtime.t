@@ -87,7 +87,111 @@ qr/setting flag: "debug_info=off"/
 
 
 
-=== TEST 5: flag directive - wasmtime - consume_fuel - on
+=== TEST 5: flag directive - wasmtime - cache_config_load - missing file
+--- skip_eval: 4: $::nginxV !~ m/wasmtime/
+--- main_config
+    wasm {
+        wasmtime {
+            flag cache_config_load missing_file;
+        }
+    }
+--- error_log eval
+qr/\[emerg\] .*? failed configuring wasmtime cache; failed to read config file: missing_file/
+--- no_error_log
+[error]
+[crit]
+--- must_die
+
+
+
+=== TEST 6: flag directive - wasmtime - cache_config_load - bad file
+--- skip_eval: 4: $::nginxV !~ m/wasmtime/
+--- user_files
+>>> wasmtime_config.toml
+invalid contents
+--- main_config
+    wasm {
+        wasmtime {
+            flag cache_config_load $TEST_NGINX_HTML_DIR/wasmtime_config.toml;
+        }
+    }
+--- error_log eval
+qr@\[emerg\] .*? failed configuring wasmtime cache; failed to parse config file: .*/wasmtime_config.toml@
+--- no_error_log
+[error]
+[crit]
+--- must_die
+
+
+
+=== TEST 7: flag directive - wasmtime - cache_config_load - good file, cache disabled
+--- skip_eval: 4: $::nginxV !~ m/wasmtime/
+--- user_files
+>>> wasmtime_config.toml
+[cache]
+enabled = false
+--- main_config eval
+qq{
+    wasm {
+        module hostcalls $t::TestWasmX::crates/hostcalls.wasm;
+
+        wasmtime {
+            flag cache_config_load $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
+        }
+    }
+}
+--- config
+    location /t {
+        proxy_wasm hostcalls 'test=/t/set_request_header \
+                              value=Hello:wasm';
+        proxy_wasm hostcalls 'test=/t/echo/headers';
+    }
+--- response_body
+Host: localhost
+Connection: close
+Hello: wasm
+--- error_log eval
+qr@setting flag: "cache_config_load=.*/wasmtime_config.toml"@
+--- no_error_log
+[error]
+
+
+
+=== TEST 8: flag directive - wasmtime - cache_config_load - good file, cache enabled
+--- skip_eval: 4: $::nginxV !~ m/wasmtime/
+--- user_files
+>>> wasmtime_config.toml
+[cache]
+enabled = true
+directory = "/tmp/ngx_wasm_module/cache/wasmtime"
+--- main_config eval
+qq{
+    wasm {
+        module hostcalls $t::TestWasmX::crates/hostcalls.wasm;
+
+        wasmtime {
+            flag cache_config_load $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
+        }
+    }
+}
+--- config
+    location /t {
+        proxy_wasm hostcalls 'test=/t/set_request_header \
+                              value=Hello:wasm';
+        proxy_wasm hostcalls 'test=/t/echo/headers';
+    }
+--- response_body
+Host: localhost
+Connection: close
+Hello: wasm
+--- error_log eval
+qr@setting flag: "cache_config_load=.*/wasmtime_config.toml"@
+--- no_error_log
+[error]
+
+
+
+=== TEST 9: flag directive - wasmtime - consume_fuel - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -103,7 +207,7 @@ qr/setting flag: "consume_fuel=on"/
 
 
 
-=== TEST 6: flag directive - wasmtime - consume_fuel - off
+=== TEST 10: flag directive - wasmtime - consume_fuel - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -119,7 +223,7 @@ qr/setting flag: "consume_fuel=off"/
 
 
 
-=== TEST 7: flag directive - wasmtime - epoch_interruption - on
+=== TEST 11: flag directive - wasmtime - epoch_interruption - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -135,7 +239,7 @@ qr/setting flag: "epoch_interruption=on"/
 
 
 
-=== TEST 8: flag directive - wasmtime - epoch_interruption - off
+=== TEST 12: flag directive - wasmtime - epoch_interruption - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -151,7 +255,7 @@ qr/setting flag: "epoch_interruption=off"/
 
 
 
-=== TEST 9: flag directive - wasmtime - max_wasm_stack
+=== TEST 13: flag directive - wasmtime - max_wasm_stack
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -167,7 +271,7 @@ qr/setting flag: "max_wasm_stack=2m"/
 
 
 
-=== TEST 10: flag directive - wasmtime - wasm_threads - on
+=== TEST 14: flag directive - wasmtime - wasm_threads - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -183,7 +287,7 @@ qr/setting flag: "wasm_threads=on"/
 
 
 
-=== TEST 11: flag directive - wasmtime - wasm_threads - off
+=== TEST 15: flag directive - wasmtime - wasm_threads - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -199,7 +303,7 @@ qr/setting flag: "wasm_threads=off"/
 
 
 
-=== TEST 12: flag directive - wasmtime - wasm_reference_types - on
+=== TEST 16: flag directive - wasmtime - wasm_reference_types - on
 --- SKIP: Unsupported (hard-coded)
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
@@ -216,7 +320,7 @@ qr/setting flag: "wasm_reference_types=on"/
 
 
 
-=== TEST 13: flag directive - wasmtime - wasm_reference_types - off
+=== TEST 17: flag directive - wasmtime - wasm_reference_types - off
 --- SKIP: Unsupported (hard-coded)
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
@@ -233,7 +337,7 @@ qr/setting flag: "wasm_reference_types=off"/
 
 
 
-=== TEST 14: flag directive - wasmtime - wasm_simd - on
+=== TEST 18: flag directive - wasmtime - wasm_simd - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -249,7 +353,7 @@ qr/setting flag: "wasm_simd=on"/
 
 
 
-=== TEST 15: flag directive - wasmtime - wasm_simd - off
+=== TEST 19: flag directive - wasmtime - wasm_simd - off
 Disable both flags to avoid:
     "cannot disable the simd proposal but enable the relaxed simd proposal"
 Shown twice in logs for master+single procs
@@ -273,7 +377,7 @@ setting flag: "wasm_relaxed_simd=off"
 
 
 
-=== TEST 16: flag directive - wasmtime - wasm_bulk_memory - on
+=== TEST 20: flag directive - wasmtime - wasm_bulk_memory - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -289,7 +393,7 @@ qr/setting flag: "wasm_bulk_memory=on"/
 
 
 
-=== TEST 17: flag directive - wasmtime - wasm_bulk_memory - off
+=== TEST 21: flag directive - wasmtime - wasm_bulk_memory - off
 Disable all three flags as 'bulk_memory' requires 'threads' and 'reference_types'
 Shown twice in logs for master+single procs
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
@@ -315,7 +419,7 @@ setting flag: "wasm_reference_types=off"
 
 
 
-=== TEST 18: flag directive - wasmtime - wasm_multi_value - on
+=== TEST 22: flag directive - wasmtime - wasm_multi_value - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -331,7 +435,7 @@ qr/setting flag: "wasm_multi_value=on"/
 
 
 
-=== TEST 19: flag directive - wasmtime - wasm_multi_value - off
+=== TEST 23: flag directive - wasmtime - wasm_multi_value - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -347,7 +451,7 @@ qr/setting flag: "wasm_multi_value=off"/
 
 
 
-=== TEST 20: flag directive - wasmtime - wasm_multi_memory - on
+=== TEST 24: flag directive - wasmtime - wasm_multi_memory - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -363,7 +467,7 @@ qr/setting flag: "wasm_multi_memory=on"/
 
 
 
-=== TEST 21: flag directive - wasmtime - wasm_multi_memory - off
+=== TEST 25: flag directive - wasmtime - wasm_multi_memory - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -379,7 +483,7 @@ qr/setting flag: "wasm_multi_memory=off"/
 
 
 
-=== TEST 22: flag directive - wasmtime - wasm_memory64 - on
+=== TEST 26: flag directive - wasmtime - wasm_memory64 - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -395,7 +499,7 @@ qr/setting flag: "wasm_memory64=on"/
 
 
 
-=== TEST 23: flag directive - wasmtime - wasm_memory64 - off
+=== TEST 27: flag directive - wasmtime - wasm_memory64 - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -411,7 +515,7 @@ qr/setting flag: "wasm_memory64=off"/
 
 
 
-=== TEST 24: flag directive - wasmtime - strategy - auto
+=== TEST 28: flag directive - wasmtime - strategy - auto
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -427,7 +531,7 @@ qr/setting flag: "strategy=auto"/
 
 
 
-=== TEST 25: flag directive - wasmtime - strategy - cranelift
+=== TEST 29: flag directive - wasmtime - strategy - cranelift
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -443,7 +547,7 @@ qr/setting flag: "strategy=cranelift"/
 
 
 
-=== TEST 26: flag directive - wasmtime - parallel_compilation - on
+=== TEST 30: flag directive - wasmtime - parallel_compilation - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -459,7 +563,7 @@ qr/setting flag: "parallel_compilation=on"/
 
 
 
-=== TEST 27: flag directive - wasmtime - parallel_compilation - off
+=== TEST 31: flag directive - wasmtime - parallel_compilation - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -475,7 +579,7 @@ qr/setting flag: "parallel_compilation=off"/
 
 
 
-=== TEST 28: flag directive - wasmtime - cranelift_debug_verifier - on
+=== TEST 32: flag directive - wasmtime - cranelift_debug_verifier - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -491,7 +595,7 @@ qr/setting flag: "cranelift_debug_verifier=on"/
 
 
 
-=== TEST 29: flag directive - wasmtime - cranelift_debug_verifier - off
+=== TEST 33: flag directive - wasmtime - cranelift_debug_verifier - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -507,7 +611,7 @@ qr/setting flag: "cranelift_debug_verifier=off"/
 
 
 
-=== TEST 30: flag directive - wasmtime - cranelift_nan_canonicalization - on
+=== TEST 34: flag directive - wasmtime - cranelift_nan_canonicalization - on
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -523,7 +627,7 @@ qr/setting flag: "cranelift_nan_canonicalization=on"/
 
 
 
-=== TEST 31: flag directive - wasmtime - cranelift_nan_canonicalization - off
+=== TEST 35: flag directive - wasmtime - cranelift_nan_canonicalization - off
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -539,7 +643,7 @@ qr/setting flag: "cranelift_nan_canonicalization=off"/
 
 
 
-=== TEST 32: flag directive - wasmtime - cranelift_opt_level - none
+=== TEST 36: flag directive - wasmtime - cranelift_opt_level - none
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -555,7 +659,7 @@ qr/setting flag: "cranelift_opt_level=none"/
 
 
 
-=== TEST 33: flag directive - wasmtime - cranelift_opt_level - speed
+=== TEST 37: flag directive - wasmtime - cranelift_opt_level - speed
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -571,7 +675,7 @@ qr/setting flag: "cranelift_opt_level=speed"/
 
 
 
-=== TEST 34: flag directive - wasmtime - cranelift_opt_level - speed_and_size
+=== TEST 38: flag directive - wasmtime - cranelift_opt_level - speed_and_size
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -587,7 +691,7 @@ qr/setting flag: "cranelift_opt_level=speed_and_size"/
 
 
 
-=== TEST 35: flag directive - wasmtime - profiler - none
+=== TEST 39: flag directive - wasmtime - profiler - none
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -603,7 +707,7 @@ qr/setting flag: "profiler=none"/
 
 
 
-=== TEST 36: flag directive - wasmtime - profiler - jitdump
+=== TEST 40: flag directive - wasmtime - profiler - jitdump
 Linux-only: jitdump support
 --- skip_eval: 4: ($::nginxV !~ m/wasmtime/ || $::osname !~ /linux/)
 --- main_config
@@ -620,7 +724,7 @@ qr/setting flag: "profiler=jitdump"/
 
 
 
-=== TEST 37: flag directive - wasmtime - profiler - vtune
+=== TEST 41: flag directive - wasmtime - profiler - vtune
 --- SKIP: vtune disabled at compile time in release builds
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
@@ -637,7 +741,7 @@ qr/setting flag: "profiler=vtune"/
 
 
 
-=== TEST 38: flag directive - wasmtime - profiler - perfmap
+=== TEST 42: flag directive - wasmtime - profiler - perfmap
 Linux-only: perfmap support
 --- skip_eval: 4: ($::nginxV !~ m/wasmtime/ || $::osname !~ /linux/)
 --- main_config
@@ -654,7 +758,7 @@ qr/setting flag: "profiler=perfmap"/
 
 
 
-=== TEST 39: flag directive - wasmtime - static_memory_maximum_size
+=== TEST 43: flag directive - wasmtime - static_memory_maximum_size
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -670,7 +774,7 @@ qr/setting flag: "static_memory_maximum_size=10m"/
 
 
 
-=== TEST 40: flag directive - wasmtime - static_memory_guard_size
+=== TEST 44: flag directive - wasmtime - static_memory_guard_size
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
@@ -686,7 +790,7 @@ qr/setting flag: "static_memory_guard_size=4000m"/
 
 
 
-=== TEST 41: flag directive - wasmtime - dynamic_memory_guard_size
+=== TEST 45: flag directive - wasmtime - dynamic_memory_guard_size
 --- skip_eval: 4: $::nginxV !~ m/wasmtime/
 --- main_config
     wasm {
