@@ -10,6 +10,7 @@
 #include <ngx_proxy_wasm_properties.h>
 #include <ngx_wasm_shm_kv.h>
 #include <ngx_wasm_shm_queue.h>
+#include <ngx_wa_metrics.h>
 #ifdef NGX_WASM_HTTP
 #include <ngx_http_proxy_wasm.h>
 #endif
@@ -1575,7 +1576,142 @@ ngx_proxy_wasm_hfuncs_dequeue_shared_queue(ngx_wavm_instance_t *instance,
 
 
 /* stats/metrics */
-/* NYI */
+
+
+static ngx_int_t
+ngx_proxy_wasm_hfuncs_define_metric(ngx_wavm_instance_t *instance,
+    wasm_val_t args[], wasm_val_t rets[])
+{
+    size_t                         max_len;
+    uint32_t                      *id;
+    ngx_str_t                      name, prefixed_name, *filter_name;
+    ngx_cycle_t                   *cycle = (ngx_cycle_t *) ngx_cycle;
+    ngx_wa_metrics_t              *metrics = ngx_wasmx_metrics(cycle);
+    ngx_wa_metric_type_e           type;
+    ngx_proxy_wasm_exec_t         *pwexec;
+    ngx_proxy_wasm_metric_type_e   pw_type;
+    u_char                         buf[metrics->config.max_metric_name_length];
+
+    pwexec = ngx_proxy_wasm_instance2pwexec(instance);
+
+    pw_type = args[0].of.i32;
+    name.len = args[2].of.i32;
+    name.data = NGX_WAVM_HOST_LIFT_SLICE(instance, args[1].of.i32, name.len);
+    id = NGX_WAVM_HOST_LIFT_SLICE(instance, args[3].of.i32, sizeof(uint32_t));
+    max_len = metrics->config.max_metric_name_length;
+
+    switch(pw_type) {
+        case NGX_PROXY_WASM_METRIC_COUNTER:
+            type = NGX_WA_METRIC_COUNTER;
+            break;
+
+        case NGX_PROXY_WASM_METRIC_GAUGE:
+            type = NGX_WA_METRIC_GAUGE;
+            break;
+
+        case NGX_PROXY_WASM_METRIC_HISTOGRAM:
+            type = NGX_WA_METRIC_HISTOGRAM;
+            break;
+
+        default:
+            return ngx_proxy_wasm_result_trap(pwexec, "unknown metric type",
+                                              rets,
+                                              NGX_WAVM_ERROR);
+    }
+
+    filter_name = pwexec->filter->name;
+
+    if (filter_name->len + 4 + name.len > max_len) {
+        return ngx_proxy_wasm_result_trap(pwexec, "metric name too long", rets,
+                                          NGX_WAVM_ERROR);
+    }
+
+    prefixed_name.data = buf;
+    prefixed_name.len = ngx_sprintf(buf, "pw.%V.%V", filter_name, &name) - buf;
+
+    if (ngx_wa_metrics_add(metrics, &prefixed_name, type, id) != NGX_OK) {
+        return ngx_proxy_wasm_result_trap(pwexec, "could not define metric",
+                                          rets,
+                                          NGX_WAVM_ERROR);
+    }
+
+    return ngx_proxy_wasm_result_ok(rets);
+}
+
+
+static ngx_int_t
+ngx_proxy_wasm_hfuncs_increment_metric(ngx_wavm_instance_t *instance,
+    wasm_val_t args[], wasm_val_t rets[])
+{
+    uint32_t                metric_id;
+    ngx_int_t               rc, offset;
+    ngx_cycle_t            *cycle = (ngx_cycle_t *) ngx_cycle;
+    ngx_wa_metrics_t       *metrics = ngx_wasmx_metrics(cycle);
+    ngx_proxy_wasm_exec_t  *pwexec = ngx_proxy_wasm_instance2pwexec(instance);
+
+    metric_id = args[0].of.i32;
+    offset = args[1].of.i64;
+
+    rc = ngx_wa_metrics_increment(metrics, metric_id, offset);
+
+    if (rc != NGX_OK) {
+        return ngx_proxy_wasm_result_trap(pwexec, "could not increment metric",
+                                          rets, NGX_WAVM_ERROR);
+    }
+
+    return ngx_proxy_wasm_result_ok(rets);
+}
+
+
+static ngx_int_t
+ngx_proxy_wasm_hfuncs_record_metric(ngx_wavm_instance_t *instance,
+    wasm_val_t args[], wasm_val_t rets[])
+{
+    uint32_t                metric_id;
+    ngx_int_t               rc, offset;
+    ngx_cycle_t            *cycle = (ngx_cycle_t *) ngx_cycle;
+    ngx_wa_metrics_t       *metrics = ngx_wasmx_metrics(cycle);
+    ngx_proxy_wasm_exec_t  *pwexec = ngx_proxy_wasm_instance2pwexec(instance);
+
+    metric_id = args[0].of.i32;
+    offset = args[1].of.i64;
+
+    rc = ngx_wa_metrics_record(metrics, metric_id, offset);
+
+    if (rc != NGX_OK) {
+        return ngx_proxy_wasm_result_trap(pwexec,
+                                          "could not record metric value", rets,
+                                          NGX_WAVM_ERROR);
+    }
+
+    return ngx_proxy_wasm_result_ok(rets);
+}
+
+
+static ngx_int_t
+ngx_proxy_wasm_hfuncs_get_metric(ngx_wavm_instance_t *instance,
+    wasm_val_t args[], wasm_val_t rets[])
+{
+    uint32_t                metric_id;
+    ngx_int_t               rc;
+    ngx_uint_t             *ret_value;
+    ngx_cycle_t            *cycle = (ngx_cycle_t *) ngx_cycle;
+    ngx_wa_metrics_t       *metrics = ngx_wasmx_metrics(cycle);
+    ngx_proxy_wasm_exec_t  *pwexec = ngx_proxy_wasm_instance2pwexec(instance);
+
+    metric_id = args[0].of.i32;
+    ret_value = NGX_WAVM_HOST_LIFT(instance, args[1].of.i32, ngx_uint_t);
+
+    rc = ngx_wa_metrics_get(metrics, metric_id, ret_value);
+
+    if (rc != NGX_OK) {
+        /* TODO: format with key */
+        return ngx_proxy_wasm_result_trap(pwexec, "could not retrieve metric",
+                                          rets, NGX_WAVM_ERROR);
+    }
+
+    return ngx_proxy_wasm_result_ok(rets);
+}
 
 
 /* custom extension points */
@@ -1957,7 +2093,7 @@ static ngx_wavm_host_func_def_t  ngx_proxy_wasm_hfuncs[] = {
       ngx_wavm_arity_i32x4,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_define_metric"),                 /* 0.2.0 && 0.2.1 */
-      &ngx_proxy_wasm_hfuncs_nop,                        /* NYI */
+      &ngx_proxy_wasm_hfuncs_define_metric,
       ngx_wavm_arity_i32x4,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_get_metric_value"),              /* vNEXT */
@@ -1965,7 +2101,7 @@ static ngx_wavm_host_func_def_t  ngx_proxy_wasm_hfuncs[] = {
       ngx_wavm_arity_i32x2,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_get_metric"),                    /* 0.2.0 && 0.2.1 */
-      &ngx_proxy_wasm_hfuncs_nop,                        /* NYI */
+      &ngx_proxy_wasm_hfuncs_get_metric,
       ngx_wavm_arity_i32x2,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_set_metric_value"),              /* vNEXT */
@@ -1973,7 +2109,7 @@ static ngx_wavm_host_func_def_t  ngx_proxy_wasm_hfuncs[] = {
       ngx_wavm_arity_i32_i64,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_record_metric"),                 /* 0.2.0 && 0.2.1 */
-      &ngx_proxy_wasm_hfuncs_nop,                        /* NYI */
+      &ngx_proxy_wasm_hfuncs_record_metric,
       ngx_wavm_arity_i32_i64,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_increment_metric_value"),        /* vNEXT */
@@ -1981,7 +2117,7 @@ static ngx_wavm_host_func_def_t  ngx_proxy_wasm_hfuncs[] = {
       ngx_wavm_arity_i32_i64,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_increment_metric"),              /* 0.2.0 && 0.2.1 */
-      &ngx_proxy_wasm_hfuncs_nop,                        /* NYI */
+      &ngx_proxy_wasm_hfuncs_increment_metric,
       ngx_wavm_arity_i32_i64,
       ngx_wavm_arity_i32 },
     { ngx_string("proxy_delete_metric"),                 /* vNEXT */

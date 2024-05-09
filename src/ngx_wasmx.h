@@ -3,6 +3,7 @@
 
 
 #include <ngx_core.h>
+#include <ngx_wa_metrics.h>
 
 
 #if (NGX_DEBUG)
@@ -27,11 +28,12 @@ typedef ngx_int_t (*ngx_wa_init_pt)(ngx_cycle_t *cycle);
 
 
 typedef struct {
-    ngx_uint_t              initialized_types;
-    void                  **wasm_confs;
+    ngx_uint_t               initialized_types;
+    void                   **wasm_confs;
 #ifdef NGX_WA_IPC
-    void                  **ipc_confs;
+    void                   **ipc_confs;
 #endif
+    ngx_wa_metrics_t        *metrics;
 } ngx_wa_conf_t;
 
 

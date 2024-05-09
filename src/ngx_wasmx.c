@@ -68,6 +68,24 @@ ngx_module_t  ngx_wasmx_module = {
 };
 
 
+ngx_inline ngx_wa_metrics_t *
+ngx_wasmx_metrics(ngx_cycle_t *cycle)
+{
+    ngx_wa_conf_t  *wacf;
+
+    if (!cycle->conf_ctx) {
+        return NULL;
+    }
+
+    wacf = ngx_wa_cycle_get_conf(cycle);
+    if (wacf == NULL) {
+        return NULL;
+    }
+
+    return wacf->metrics;
+}
+
+
 static char *
 ngx_wasmx_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf,
     ngx_uint_t type, ngx_uint_t conf_type)
@@ -115,6 +133,11 @@ ngx_wasmx_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf,
             return NGX_CONF_ERROR;
         }
 #endif
+
+        wacf->metrics = ngx_wa_metrics_alloc(cf->cycle);
+        if (wacf->metrics == NULL) {
+            return NGX_CONF_ERROR;
+        }
 
         *(ngx_wa_conf_t **) conf = wacf;
     }
@@ -217,6 +240,10 @@ ngx_wasmx_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf,
         }
     }
 
+    if (ngx_wa_metrics_init_conf(wacf->metrics, cf) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
     return NGX_CONF_OK;
 }
 
@@ -247,6 +274,11 @@ ngx_wasmx_init(ngx_cycle_t *cycle)
     wacf = ngx_wa_cycle_get_conf(cycle);
     if (wacf == NULL) {
         return NGX_OK;
+    }
+
+    rc = ngx_wa_metrics_init(wacf->metrics, cycle);
+    if (rc != NGX_OK) {
+        return rc;
     }
 
     /* NGX_WASM_MODULES + NGX_IPC_MODULES init */

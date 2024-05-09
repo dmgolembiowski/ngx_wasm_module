@@ -1,4 +1,4 @@
-use crate::{test_http::*, types::*};
+use crate::{test_http::*, tests::*, types::*};
 use http::StatusCode;
 use log::*;
 use proxy_wasm::{traits::*, types::*};
@@ -102,6 +102,10 @@ impl Context for TestHttp {
                     Some(format!("called {} times", self.n_sync_calls + 1).as_str()),
                 );
             }
+            "define_metrics" => test_define_metrics(self, TestPhase::HTTPCallResponse),
+            "increment_counters" => test_increment_counters(self, TestPhase::HTTPCallResponse, None),
+            "toggle_gauges" => test_toggle_gauges(self, TestPhase::HTTPCallResponse, None),
+            "record_histograms" => test_record_metric(self, TestPhase::HTTPCallResponse),
             _ => {}
         }
 
