@@ -950,7 +950,7 @@ ngx_http_wasm_content(ngx_http_wasm_req_ctx_t *rctx)
         /* e.g. lua handler yield */
         r->main->count++;
         dd("r->main->count++: %d", r->main->count);
-        rc = NGX_AGAIN;
+        rc = NGX_DONE;
         goto done;
     default:
         dd("enter/continue");
@@ -970,6 +970,10 @@ ngx_http_wasm_content(ngx_http_wasm_req_ctx_t *rctx)
     case NGX_AGAIN:
         goto done;
     case NGX_OK:
+        if (rctx->in_wev) {
+            goto done;
+        }
+
         goto finalize;
     case NGX_DECLINED:
         if (rctx->exited_content_phase) {
@@ -1026,8 +1030,6 @@ orig:
         if (rctx->r_content_handler && !rctx->resp_content_chosen) {
             ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "wasm running orig \"content\" handler");
-
-            rctx->resp_content_chosen = 1;
 
             rc = rctx->r_content_handler(r);
 
@@ -1200,7 +1202,7 @@ ngx_http_wasm_wev_handler(ngx_http_request_t *r)
         if (rc == NGX_OK || rc == NGX_DONE) {
             if (r == r->main) {
                 r->write_event_handler = ngx_http_core_run_phases;
-                ngx_http_wasm_resume(rctx, r == r->main, 1);
+                ngx_http_wasm_resume(rctx);
                 return;
             }
 
@@ -1253,34 +1255,14 @@ ngx_http_wasm_set_resume_handler(ngx_http_wasm_req_ctx_t *rctx)
 
 
 void
-ngx_http_wasm_resume(ngx_http_wasm_req_ctx_t *rctx, unsigned main, unsigned wev)
+ngx_http_wasm_resume(ngx_http_wasm_req_ctx_t *rctx)
 {
     ngx_http_request_t  *r = rctx->r;
     ngx_connection_t    *c = r->connection;
 
-    dd("enter");
-
-    ngx_wa_assert(wev);
-
-    if (ngx_wasm_yielding(&rctx->env)) {
-        dd("yielding");
-        return;
-    }
-
-    if (main) {
-        if (wev) {
-            dd("resuming request wev...");
-            r->write_event_handler(r);
-            dd("...done resuming request wev");
-        }
-#if 0
-        else {
-            dd("resuming request rev...");
-            r->read_event_handler(r);
-            dd("...done resuming request");
-        }
-#endif
-    }
+    dd("resuming request wev...");
+    r->write_event_handler(r);
+    dd("...done resuming request wev");
 
     dd("running posted requests...");
     ngx_http_run_posted_requests(c);
