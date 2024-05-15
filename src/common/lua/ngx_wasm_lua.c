@@ -329,7 +329,9 @@ thread_handle_rc(ngx_wasm_lua_ctx_t *lctx, ngx_int_t rc)
             ngx_queue_remove(&lctx->q);
 
             if (lctx->error_handler) {
-                (void) lctx->error_handler(lctx);
+                /* error_handler can override the rc (e.g. lua resolver errors
+                 * are ignored by the request flow */
+                rc = lctx->error_handler(lctx);
             }
         }
 

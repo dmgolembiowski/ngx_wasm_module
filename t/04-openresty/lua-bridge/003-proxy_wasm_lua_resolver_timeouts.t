@@ -83,10 +83,10 @@ qq{
                               test=/t/dispatch_http_call \
                               host=timeout_trigger';
         echo_sleep 0.3;
-        echo failed;
+        echo ok;
     }
---- error_code: 500
---- response_body_like: 500 Internal Server Error
+--- response_body
+ok
 --- grep_error_log eval: qr/\[error\].*/
 --- grep_error_log_out eval
 qr/\[error\] .*? lua udp socket read timed out.*?
@@ -132,7 +132,7 @@ qq{
 --- config
     location /t {
         proxy_wasm_lua_resolver on;
-        proxy_wasm hostcalls 'tick_period=5 \
+        proxy_wasm hostcalls 'tick_period=300 \
                               on_tick=dispatch \
                               host=httpbin.org \
                               path=/headers';
