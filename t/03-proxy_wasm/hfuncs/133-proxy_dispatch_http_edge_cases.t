@@ -397,3 +397,36 @@ qr/\A\[error] .*? dispatch failed: tcp socket - Connection refused
 [crit]
 [emerg]
 [alert]
+
+
+
+=== TEST 12: proxy_wasm - dispatch_http_call() datakit repro
+--- skip_eval: 6: $ENV{TEST_NGINX_USE_VALGRIND} == 0
+--- valgrind
+--- user_files
+>>> wasmtime_config.toml
+[cache]
+enabled = true
+directory = "/tmp/ngx_wasm_module/cache/wasmtime"
+--- main_config eval
+qq{
+    wasm {
+        module datakit $t::TestWasmX::crates/datakit.wasm;
+
+        wasmtime {
+            cache_config $ENV{TEST_NGINX_HTML_DIR}/wasmtime_config.toml;
+        }
+    }
+}
+--- timeout: 600s
+--- config
+    location /t {
+        proxy_wasm datakit '{"nodes":[{"name":"CALL1","type":"call","url":"http://127.0.0.1:1/json"},{"name":"RESP","status":"500","type":"response"}]}';
+    }
+--- error_code: 500
+--- no_error_log
+[crit]
+[emerg]
+[alert]
+[stub1]
+[stub2]

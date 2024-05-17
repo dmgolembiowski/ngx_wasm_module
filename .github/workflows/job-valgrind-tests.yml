@@ -119,7 +119,10 @@ jobs:
       - name: Run tests
         run: |
            IN_PATH="${{ inputs.path }}"
-           ./util/test.sh ${IN_PATH:-t/} 2>&1 | tee valgrind.out
+           mkdir -p work/lib/wasm/
+           wget https://github.com/Kong/datakit-filter/releases/download/0.1.0/datakit.wasm
+           mv datakit.wasm work/lib/wasm/
+           ./util/test.sh ${IN_PATH:-t/} t/03-proxy_wasm/hfuncs/133-proxy_dispatch_http_edge_cases.t 2>&1 | tee valgrind.out
       - run: |
           awk -f ./util/parse-valgrind.awk valgrind.out > valgrind.log
           if [[ -s valgrind.log ]]; then
