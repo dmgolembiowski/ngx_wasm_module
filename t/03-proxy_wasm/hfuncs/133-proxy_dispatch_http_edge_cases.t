@@ -397,3 +397,22 @@ qr/\A\[error] .*? dispatch failed: tcp socket - Connection refused
 [crit]
 [emerg]
 [alert]
+
+
+
+=== TEST 12: proxy_wasm - dispatch_http_call() followed by a local response
+--- valgrind
+--- wasm_modules: hostcalls
+--- config
+    location /t {
+        proxy_wasm hostcalls 'on=request_headers \
+                              test=/t/dispatch_and_local_response \
+                              host=127.0.0.1:1';
+    }
+--- error_code: 201
+--- response_body
+--- no_error_log
+[error]
+[crit]
+[emerg]
+[alert]

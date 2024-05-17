@@ -192,7 +192,7 @@ jobs:
             ngx: 1.25.5
             hup: no_hup
             debug: debug
-            path: t/01-wasm
+            path: t/01-wasm t/03-proxy_wasm/hfuncs/133-proxy_dispatch_http_edge_cases.t
           # V8
           - runtime: v8
             v8: 12.0.267.17
