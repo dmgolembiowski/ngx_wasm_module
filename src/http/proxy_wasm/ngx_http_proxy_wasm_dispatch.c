@@ -94,7 +94,7 @@ ngx_http_proxy_wasm_dispatch_err(ngx_http_proxy_wasm_dispatch_t *call)
     }
 #endif
 
-    pwexec->ecode = NGX_PROXY_WASM_ERR_DISPATCH_FAILED;
+    //pwexec->ecode = NGX_PROXY_WASM_ERR_DISPATCH_FAILED;
 
     if (!pwexec->ictx->instance->hostcall || rctx->fake_request) {
         ngx_wasm_log_error(NGX_LOG_ERR, pwexec->log, 0,

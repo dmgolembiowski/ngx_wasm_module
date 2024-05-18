@@ -57,6 +57,10 @@ static const char  *DNS_SOLVING_SCRIPT = ""
     "            'nameserver '      .. nameserver,                        \n"
     "            'options timeout:' .. timeout,                           \n"
     "        },                                                           \n"
+#if 0
+    /* for debugging purposes */
+    "        order = { 'A' },                                             \n"
+#endif
     "    })                                                               \n"
     "    if not ok then                                                   \n"
     "        error(fmt('wasm lua failed initializing dns_client ' ..      \n"

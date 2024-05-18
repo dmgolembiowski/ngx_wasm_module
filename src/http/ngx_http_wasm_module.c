@@ -940,6 +940,7 @@ ngx_http_wasm_content(ngx_http_wasm_req_ctx_t *rctx)
 {
     ngx_int_t            rc;
     ngx_http_request_t  *r = rctx->r;
+    unsigned             done = 0;
 
     switch (rctx->env.state) {
     case NGX_WASM_STATE_ERROR:
@@ -970,7 +971,7 @@ ngx_http_wasm_content(ngx_http_wasm_req_ctx_t *rctx)
     case NGX_AGAIN:
         goto done;
     case NGX_OK:
-        if (rctx->in_wev) {
+        if (rctx->in_wev && rctx->entered_content_phase) {
             goto done;
         }
 
@@ -1032,6 +1033,7 @@ orig:
                            "wasm running orig \"content\" handler");
 
             rc = rctx->r_content_handler(r);
+            dd("orig \"content\" rc: %ld", rc);
 
         } else if (r->header_sent || rctx->resp_content_sent) {
             rc = NGX_OK;
@@ -1050,7 +1052,15 @@ finalize:
 
     rctx->exited_content_phase = 1;
 
+    if (rctx->in_wev && r->main->count == 1) {
+        done = 1;
+    }
+
     rc = ngx_http_wasm_check_finalize(rctx, rc);
+
+    if (done && rctx->resp_finalized) {
+        rc = NGX_ABORT;
+    }
 
 done:
 
@@ -1188,6 +1198,9 @@ ngx_http_wasm_wev_handler(ngx_http_request_t *r)
             goto last_finalize;
 
         } else if (rc == NGX_DONE) {
+            goto last_finalize;
+
+        } else if (rc == NGX_ABORT) {
             return;
         }
 
@@ -1214,12 +1227,18 @@ ngx_http_wasm_wev_handler(ngx_http_request_t *r)
 
 last_finalize:
 
+    dd("r->count: %ld", r->main->count);
+
     if (rctx->fake_request) {
         dd("last finalize (fake request)");
         ngx_wa_assert(r->connection->fd == NGX_WA_BAD_FD);
         ngx_http_wasm_finalize_fake_request(r, NGX_DONE);
 
-    } else {
+    } else if (rctx->entered_content_phase
+               || (rctx->resp_content_sent
+                   && !rctx->entered_content_phase
+                   && !rctx->resp_finalized))
+    {
         dd("last finalize (rc: %ld, main: %d, count: %d)",
            rc, r == r->main, r->main->count);
         ngx_wa_assert(r->connection->fd != NGX_WA_BAD_FD);

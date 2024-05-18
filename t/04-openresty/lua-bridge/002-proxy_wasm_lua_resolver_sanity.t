@@ -474,10 +474,9 @@ ok
 --- grep_error_log_out eval
 qr/\[error\] .*? lua user thread aborted: .*? wasm lua failed resolving "foo": dns client error: 101 empty record received.*?
 \[error\] .*? dispatch failed: tcp socket - lua resolver failed/
---- error_log eval
-qr/\[info\] .*? filter chain failed resuming: previous error \(dispatch failure\).*?/
 --- no_error_log
 [crit]
+[emerg]
 
 
 

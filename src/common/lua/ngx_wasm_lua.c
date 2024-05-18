@@ -33,9 +33,18 @@ static const char  *WASM_LUA_ENTRY_SCRIPT = ""
 static void
 destroy_thread(ngx_wasm_lua_ctx_t *lctx)
 {
+    ngx_http_lua_co_ctx_t  *coctx;
+
     ngx_log_debug2(NGX_LOG_DEBUG_WASM, ngx_cycle->log, 0,
                    "wasm freeing lua%sthread (lctx: %p)",
                    lctx->entry ? " entry " : " user ", lctx);
+
+    coctx = lctx->co_ctx;
+
+    if (coctx && coctx->cleanup) {
+        coctx->cleanup(coctx);
+        coctx->cleanup = NULL;
+    }
 
     ngx_pfree(lctx->pool, lctx->cache_key);
     ngx_pfree(lctx->pool, lctx);

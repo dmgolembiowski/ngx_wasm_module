@@ -98,7 +98,56 @@ qr/\[error\] .*? lua udp socket read timed out.*?
 
 
 
-=== TEST 3: Lua bridge - on_tick Lua resolver can timeout during cosocket I/O
+=== TEST 3: Lua bridge - on_request_body Lua resolver can timeout during cosocket I/O
+lua-resty-dns-resolver client timeout
+Behaves strangely on GHA Valgrind. Seems fine locally.
+Will run with TEST_NGINX_USE_VALGRIND_ALL.
+--- load_nginx_modules: ngx_http_echo_module
+--- wasm_modules: hostcalls
+--- http_config eval
+qq{
+    init_worker_by_lua_block {
+        dns_client = require 'resty.dns.client'
+        local opts = {
+            noSynchronisation = true,
+            order = { 'A' },
+            hosts = { '127.0.0.1 localhost' },
+            resolvConf = {
+                'nameserver $::ExtResolver',
+                'options timeout:1', -- 1000ms timeout
+                'options attempts:1',
+            }
+        }
+        assert(dns_client.init(opts))
+        opts.timeout = 1 -- force 1ms timeout
+    }
+}
+--- config
+    location /t {
+        proxy_wasm_lua_resolver on;
+        proxy_wasm hostcalls 'on=request_body \
+                              test=/t/dispatch_http_call \
+                              host=timeout_trigger';
+        echo_sleep 0.3;
+        echo ok;
+    }
+--- request
+POST /t
+Hello world
+--- response_body
+ok
+--- grep_error_log eval: qr/\[error\].*/
+--- grep_error_log_out eval
+qr/\[error\] .*? lua udp socket read timed out.*?
+\[error\] .*? lua user thread aborted: .*? wasm lua failed resolving "timeout_trigger": failed to receive reply.*?
+\[error\] .*? dispatch failed: tcp socket - lua resolver failed.*?/
+--- no_error_log
+[crit]
+[alert]
+
+
+
+=== TEST 4: Lua bridge - on_tick Lua resolver can timeout during cosocket I/O
 Using a non-local resolver
 lua-resty-dns-resolver client timeout
 Behaves strangely on GHA Valgrind. Seems fine locally.
